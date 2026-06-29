@@ -102,9 +102,14 @@ uv run podbase db reset --confirm  # delete database and start fresh
 
 ## Configuration
 
-Set the `PODBASE_DATA_DIR` environment variable to override the default data directory (`./data`):
+The data directory (database + temp audio) is resolved in this order:
+
+1. **`PODBASE_DATA_DIR` env var** — explicit override, takes highest priority
+2. **Project root detection** — walks up from the current directory looking for `pyproject.toml` with `name = "podbase"`, uses `<root>/data`
+3. **XDG fallback** — `~/.local/share/podbase` (used when running outside the project)
 
 ```bash
+# Override the data directory
 export PODBASE_DATA_DIR="/path/to/storage"
 ```
 

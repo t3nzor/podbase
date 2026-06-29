@@ -1,15 +1,37 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+
+_PODBASE_PROJECT_NAME = "podbase"
+
+
+def _find_project_root() -> Path | None:
+    """Walk up from cwd looking for a pyproject.toml with name='podbase'."""
+    current = Path.cwd()
+    for candidate in [current, *current.parents]:
+        pyproject = candidate / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                with open(pyproject, "rb") as f:
+                    data = tomllib.load(f)
+                if data.get("project", {}).get("name") == _PODBASE_PROJECT_NAME:
+                    return candidate
+            except (tomllib.TOMLDecodeError, OSError):
+                continue
+    return None
 
 
 def _default_data_dir() -> Path:
     env = os.environ.get("PODBASE_DATA_DIR")
     if env:
         return Path(env)
-    return Path(__file__).resolve().parent.parent.parent / "data"
+    project_root = _find_project_root()
+    if project_root is not None:
+        return project_root / "data"
+    return Path.home() / ".local" / "share" / "podbase"
 
 
 @dataclass

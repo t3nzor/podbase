@@ -54,9 +54,10 @@ src/podbase/
 
 ### Data storage
 
-Everything lives in a single SQLite database at `data/podbase.db` (gitignored).
-Audio downloads go to `data/audio/` and are **deleted after successful transcription** by default.
-Set `PODBASE_DATA_DIR` env var to override the data directory.
+Everything lives in a single SQLite database at `<data_dir>/podbase.db` (gitignored).
+Audio downloads go to `<data_dir>/audio/` and are **deleted after successful transcription** by default.
+
+Data directory resolution: `PODBASE_DATA_DIR` env var > project root `data/` > `~/.local/share/podbase/`.
 
 ### Schema
 
