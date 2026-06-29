@@ -96,6 +96,13 @@ def transcribe(
     all_new: bool = typer.Option(
         False, "--all-new", help="Transcribe all episodes in 'new' status"
     ),
+    latest: int | None = typer.Option(
+        None,
+        "--latest",
+        "-l",
+        help="Transcribe the N most recent new episodes",
+    ),
+    podcast: int | None = typer.Option(None, "--podcast", "-p", help="Limit to a specific podcast"),
 ) -> None:
     """Transcribe downloaded episodes using Whisper."""
     from podbase.ingest.download import download_audio
@@ -105,27 +112,51 @@ def transcribe(
     cfg = _cfg()
     db = _db(cfg)
     try:
-        if episode is None and not pending and not all_new:
-            console.print("[red]Provide --episode, --pending, or --all-new[/red]")
+        selectors = [
+            episode is not None,
+            pending,
+            all_new,
+            latest is not None,
+        ]
+        if sum(selectors) == 0:
+            console.print("[red]Provide one of: --episode, --pending, --all-new, --latest[/red]")
+            raise typer.Exit(1)
+        if sum(selectors) > 1:
+            console.print("[red]Use only one of: --episode, --pending, --all-new, --latest[/red]")
             raise typer.Exit(1)
 
         # Collect episode IDs
         if episode is not None:
             ep_ids = [episode]
+        elif latest is not None:
+            sql = "SELECT id FROM episodes WHERE status = ?"
+            params: list[object] = [EpisodeStatus.NEW.value]
+            if podcast is not None:
+                sql += " AND podcast_id = ?"
+                params.append(podcast)
+            sql += " ORDER BY COALESCE(published_at, '') DESC LIMIT ?"
+            params.append(latest)
+            rows = db.conn.execute(sql, params).fetchall()
+            ep_ids = [r["id"] for r in rows]
         elif all_new:
-            rows = db.conn.execute(
-                "SELECT id FROM episodes WHERE status = ?",
-                (EpisodeStatus.NEW.value,),
-            ).fetchall()
+            sql = "SELECT id FROM episodes WHERE status = ?"
+            params = [EpisodeStatus.NEW.value]
+            if podcast is not None:
+                sql += " AND podcast_id = ?"
+                params.append(podcast)
+            rows = db.conn.execute(sql, params).fetchall()
             ep_ids = [r["id"] for r in rows]
         else:  # pending
-            rows = db.conn.execute(
-                """\
+            sql = """\
                 SELECT e.id FROM episodes e
                 JOIN jobs j ON j.episode_id = e.id
                 WHERE j.kind = 'transcribe' AND j.status IN ('pending', 'failed')
-                """
-            ).fetchall()
+            """
+            params = []
+            if podcast is not None:
+                sql += " AND e.podcast_id = ?"
+                params.append(podcast)
+            rows = db.conn.execute(sql, params).fetchall()
             ep_ids = [r["id"] for r in rows]
 
         if not ep_ids:

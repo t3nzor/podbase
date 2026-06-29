@@ -14,6 +14,7 @@ uv run podbase subscribe <url>   # add podcast RSS feed
 uv run podbase sync              # pull new episodes from all feeds
 uv run podbase download <id>     # download audio for an episode
 uv run podbase transcribe --pending  # transcribe all pending episodes
+uv run podbase transcribe --latest 10 --podcast 1  # transcribe 10 most recent of podcast 1
 uv run podbase search "query"    # FTS5 search across transcripts
 uv run podbase list podcasts     # list subscriptions
 uv run podbase list episodes     # list episodes

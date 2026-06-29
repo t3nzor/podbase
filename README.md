@@ -69,7 +69,11 @@ Downloads audio for a specific episode. Supports resume on interrupted downloads
 uv run podbase transcribe --pending       # transcribe all pending jobs
 uv run podbase transcribe --episode 42    # transcribe a specific episode
 uv run podbase transcribe --all-new       # transcribe all episodes in 'new' status
+uv run podbase transcribe --latest 10 --podcast 1  # 10 most recent of podcast 1
+uv run podbase transcribe --latest 5      # 5 most recent across all podcasts
 ```
+
+Only one selector (`--episode`, `--pending`, `--all-new`, `--latest`) may be used at a time. The `--podcast` filter works with all selectors.
 
 Uses faster-whisper with the `large-v3` model. Automatically uses GPU if available, falls back to CPU. Audio files are deleted after successful transcription by default.
 
