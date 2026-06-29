@@ -9,7 +9,7 @@ def _default_data_dir() -> Path:
     env = os.environ.get("PODBASE_DATA_DIR")
     if env:
         return Path(env)
-    return Path(__file__).resolve().parent.parent.parent.parent / "data"
+    return Path(__file__).resolve().parent.parent.parent / "data"
 
 
 @dataclass
