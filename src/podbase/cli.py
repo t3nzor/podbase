@@ -70,16 +70,58 @@ def sync(
 
 @app.command()
 def download(
-    episode: int = typer.Argument(help="Episode ID to download"),
+    episode: int | None = typer.Argument(None, help="Episode ID to download"),
+    latest: int | None = typer.Option(
+        None,
+        "--latest",
+        "-l",
+        help="Download the N most recent new episodes",
+    ),
+    podcast: int | None = typer.Option(None, "--podcast", "-p", help="Limit to a specific podcast"),
 ) -> None:
-    """Download audio for an episode."""
+    """Download audio for one or more episodes."""
     from podbase.ingest.download import download_audio
 
     cfg = _cfg()
     db = _db(cfg)
     try:
-        path = download_audio(db, episode, cfg.audio_dir)
-        console.print(f"[green]✓[/green] Downloaded: {path}")
+        selectors = [episode is not None, latest is not None]
+        if sum(selectors) == 0:
+            console.print("[red]Provide an episode ID or --latest[/red]")
+            raise typer.Exit(1)
+        if sum(selectors) > 1:
+            console.print("[red]Use either an episode ID or --latest, not both[/red]")
+            raise typer.Exit(1)
+
+        if episode is not None:
+            ep_ids = [episode]
+        else:
+            assert latest is not None
+            sql = "SELECT id FROM episodes WHERE status = ?"
+            params: list[object] = [EpisodeStatus.NEW.value]
+            if podcast is not None:
+                sql += " AND podcast_id = ?"
+                params.append(podcast)
+            sql += " ORDER BY COALESCE(published_at, '') DESC LIMIT ?"
+            params.append(latest)
+            rows = db.conn.execute(sql, params).fetchall()
+            ep_ids = [r["id"] for r in rows]
+
+        if not ep_ids:
+            console.print("[yellow]No episodes to download.[/yellow]")
+            return
+
+        ok = 0
+        for i, eid in enumerate(ep_ids, 1):
+            console.print(f"[{i}/{len(ep_ids)}] Downloading episode {eid}...")
+            try:
+                path = download_audio(db, eid, cfg.audio_dir)
+                console.print(f"  [green]✓[/green] {path}")
+                ok += 1
+            except Exception as exc:
+                console.print(f"  [red]✗[/red] {exc}")
+
+        console.print(f"[green]✓[/green] Downloaded {ok}/{len(ep_ids)} episodes")
     finally:
         db.close()
 

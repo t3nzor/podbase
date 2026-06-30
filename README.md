@@ -58,10 +58,12 @@ Fetches new episodes from all subscribed feeds using ETag caching.
 ### Download audio
 
 ```bash
-uv run podbase download <episode-id>
+uv run podbase download <episode-id>             # single episode
+uv run podbase download --latest 10 --podcast 1  # 10 most recent of podcast 1
+uv run podbase download --latest 5               # 5 most recent across all podcasts
 ```
 
-Downloads audio for a specific episode. Supports resume on interrupted downloads.
+Only `new` episodes are picked by `--latest`; already-downloaded ones are skipped. Supports resume on interrupted downloads. The `--podcast` filter works with both single-episode and `--latest` modes.
 
 ### Transcribe episodes
 

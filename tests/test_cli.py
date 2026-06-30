@@ -178,3 +178,114 @@ class TestTranscribeLatest:
             tmp_path, ["--pending", "--podcast", "1"]
         )
         assert captured == [1]
+
+
+def _run_download_with_capture(
+    tmp_path: Path,
+    args: list[str],
+) -> list[int]:
+    """Run `podbase download <args>` and return the episode IDs
+    that were passed to download_audio."""
+    captured: list[int] = []
+
+    def fake_download_audio(
+        db: Database, episode_id: int, audio_dir: Path, **kw: object
+    ) -> Path:
+        captured.append(episode_id)
+        return Path(f"/dev/null/{episode_id}.mp3")
+
+    with patch(
+        "podbase.ingest.download.download_audio",
+        side_effect=fake_download_audio,
+    ):
+        result = runner.invoke(
+            app,
+            ["download", *args],
+            env={"PODBASE_DATA_DIR": str(tmp_path)},
+        )
+
+    assert result.exit_code == 0, result.output
+    return captured
+
+
+class TestDownloadLatest:
+    def _setup_db(self, tmp_path: Path) -> Database:
+        db = Database(tmp_path / "podbase.db")
+        db.migrate()
+        db.conn.execute(
+            "INSERT INTO podcasts (id, title, rss_url) VALUES (1, 'A', 'https://a')",
+        )
+        db.conn.execute(
+            "INSERT INTO podcasts (id, title, rss_url) VALUES (2, 'B', 'https://b')",
+        )
+        db.conn.commit()
+        _seed_episodes(db, 1, 15)
+        _seed_episodes(db, 2, 15)
+        return db
+
+    def test_latest_selects_most_recent(self, tmp_path: Path) -> None:
+        """--latest 10 --podcast 1 picks the 10 most recent new episodes."""
+        self._setup_db(tmp_path)
+        captured = _run_download_with_capture(
+            tmp_path, ["--latest", "10", "--podcast", "1"]
+        )
+        assert len(captured) == 10
+
+    def test_latest_without_podcast(self, tmp_path: Path) -> None:
+        """--latest 5 across both podcasts picks the 5 globally most recent."""
+        self._setup_db(tmp_path)
+        captured = _run_download_with_capture(tmp_path, ["--latest", "5"])
+        assert len(captured) == 5
+
+    def test_latest_fewer_than_n(self, tmp_path: Path) -> None:
+        """If a podcast has fewer than N new episodes, return all of them."""
+        db = Database(tmp_path / "podbase.db")
+        db.migrate()
+        db.conn.execute(
+            "INSERT INTO podcasts (id, title, rss_url) VALUES (1, 'A', 'https://a')",
+        )
+        db.conn.commit()
+        _seed_episodes(db, 1, 3)
+
+        captured = _run_download_with_capture(
+            tmp_path, ["--latest", "10", "--podcast", "1"]
+        )
+        assert len(captured) == 3
+
+    def test_latest_excludes_non_new(self, tmp_path: Path) -> None:
+        """Episodes already downloaded or transcribed should not be picked."""
+        db = self._setup_db(tmp_path)
+        for i in range(5):
+            db.conn.execute(
+                "UPDATE episodes SET status = 'downloaded' WHERE guid = ?",
+                (f"ep-1-{i}",),
+            )
+        for i in range(5, 10):
+            db.conn.execute(
+                "UPDATE episodes SET status = 'transcribed' WHERE guid = ?",
+                (f"ep-1-{i}",),
+            )
+        db.conn.commit()
+
+        captured = _run_download_with_capture(
+            tmp_path, ["--latest", "10", "--podcast", "1"]
+        )
+        # Only episodes 10..14 are still 'new' (5 episodes)
+        assert len(captured) == 5
+
+    def test_mutual_exclusivity(self, tmp_path: Path) -> None:
+        """Passing both episode ID and --latest should error."""
+        self._setup_db(tmp_path)
+        result = runner.invoke(
+            app,
+            ["download", "42", "--latest", "5"],
+            env={"PODBASE_DATA_DIR": str(tmp_path)},
+        )
+        assert result.exit_code != 0
+        assert "either" in result.output.lower() or "not both" in result.output.lower()
+
+    def test_single_episode_still_works(self, tmp_path: Path) -> None:
+        """download <id> (no --latest) still works."""
+        self._setup_db(tmp_path)
+        captured = _run_download_with_capture(tmp_path, ["1"])
+        assert captured == [1]
