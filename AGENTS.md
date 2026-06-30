@@ -75,6 +75,8 @@ Data directory resolution: `PODBASE_DATA_DIR` env var > project root `data/` > `
 Uses **faster-whisper** with `large-v3` model, `device="cuda"`, `compute_type="int8"`.
 Falls back to CPU if no GPU available. Config is in `config.py`.
 
+GPU support is an optional dependency: `uv sync --extra gpu` installs `nvidia-cublas-cu12` + `nvidia-cuda-runtime-cu12` (CUDA 12 libraries from pip). Without it, transcription runs on CPU. No system CUDA or Ollama required.
+
 ### Search
 
 FTS5 keyword search with BM25 ranking. Filters: `--podcast`, `--since`, `--limit`.

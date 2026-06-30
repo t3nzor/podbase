@@ -8,17 +8,18 @@ Subscribe to podcast RSS feeds, automatically download and transcribe episodes w
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) package manager
-- A CUDA-compatible GPU (recommended) or CPU for transcription
+- An NVIDIA GPU (recommended for fast transcription; CPU fallback is automatic)
 
 ## Installation
 
 ```bash
 git clone git@github.com:t3nzor/podbase.git
 cd podbase
-uv sync
+uv sync                          # CPU-only (works everywhere)
+uv sync --extra gpu              # GPU-accelerated (requires NVIDIA GPU)
 ```
 
-This installs all dependencies including dev tools (ruff, mypy, pytest).
+Without `--extra gpu`, transcription runs on CPU (slower but functional). With `--extra gpu`, CUDA 12 libraries are installed from pip into the venv — no system CUDA install or Ollama required.
 
 ## Quick start
 
